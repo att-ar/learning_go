@@ -20,7 +20,7 @@ func structs() {
 // Dog is a struct
 type Dog struct {
 	// exported/public fields
-	Breed string
+	Breed  string
 	Weight int
 	// private fields
 	// lowercase

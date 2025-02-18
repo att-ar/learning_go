@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 )
 
 const url = "https://pokeapi.co/api/v2/pokemon/charizard"
@@ -17,18 +16,19 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	defer res.Body.Close() // closes the connection
+
 	// When you do res.Status, Go automatically dereferences the res pointer to access the Status field of the struct that res points to.
 	// This is equivalent to (*res).Status, but Go allows you to omit the explicit dereference.
 	fmt.Printf("Response Status: %v\n", res.Status)
-	defer res.Body.Close() // closes network resources
 
 	bytes, err := io.ReadAll(res.Body)
+
 	if err != nil {
 		panic(err)
 	}
-	content := string(bytes)
 	// since pokemon is a pointer when we print it we need to dereference it with *
-	pokemon, err := pokemonFromJson(content)
+	pokemon, err := pokemonFromJson(bytes)
 	if err != nil {
 		panic(err)
 	}
@@ -39,28 +39,45 @@ func main() {
 }
 
 // Example function to unmarshal JSON into the struct
-func pokemonFromJson(content string) (*Pokemon, error) {
+func pokemonFromJson(content []byte) (*Pokemon, error) {
 	pokemonJSON := new(pokemonJSON) // new makes a pointer to the struct
 
-	// Unmarshal requires a byte slice, which means the data must be fully available in memory.
-	// NewDecoder works with any io.Reader, allowing for more flexible and potentially more efficient input handling, especially with streams or large files.
-	// In summary, the choice between json.NewDecoder and json.Unmarshal depends on the source of your JSON data and your application's memory efficiency requirements.
+	// // Unmarshal requires a byte slice, which means the data must be fully available in memory.
+	// // NewDecoder works with any io.Reader, allowing for more flexible and potentially more efficient input handling, especially with streams or large files.
+	// // In summary, the choice between json.NewDecoder and json.Unmarshal depends on the source of your JSON data and your application's memory efficiency requirements.
 
-	decoder := json.NewDecoder(strings.NewReader(content))
-	err := decoder.Decode(pokemonJSON) // Decode the JSON directly into the struct.
-	// err := json.Unmarshal([]byte(content), &pokemonJSON)
+	// decoder := json.NewDecoder(strings.NewReader(content))
+	// err := decoder.Decode(pokemonJSON) // Decode the JSON directly into the struct.
+	// // err := json.Unmarshal([]byte(content), &pokemonJSON)
+	// if err != nil {
+	// 	// return the memory address of an empty Pokemon struct and the error
+	// 	return &Pokemon{}, err
+	// }
+
+	err := json.Unmarshal(content, pokemonJSON)
 	if err != nil {
-		// return the memory address of an empty Pokemon struct and the error
-		return &Pokemon{}, err
+		return nil, err
 	}
 
-	// Simplify the Types field to just a slice of strings for Pokemon types
-	simplifiedTypes := make([]string, len(pokemonJSON.Types))
-	for i, t := range pokemonJSON.Types {
-		simplifiedTypes[i] = t.Type.Name
+	// Convert pokemonJSON to Pokemon
+	pokemon := &Pokemon{
+		Name: pokemonJSON.Name,
+		Type: make([]string, len(pokemonJSON.Types)),
 	}
-	// return the memory address of a Pokemon struct with the Name and Type fields set and the error
-	return &Pokemon{pokemonJSON.Name, simplifiedTypes}, nil
+	// Simplify the Types field to just a slice of strings for Pokemon types
+	for i, t := range pokemonJSON.Types {
+		pokemon.Type[i] = t.Type.Name
+	}
+
+	return pokemon, nil
+
+	// // Simplify the Types field to just a slice of strings for Pokemon types
+	// simplifiedTypes := make([]string, len(pokemonJSON.Types))
+	// for i, t := range pokemonJSON.Types {
+	// 	simplifiedTypes[i] = t.Type.Name
+	// }
+	// // return the memory address of a Pokemon struct with the Name and Type fields set and the error
+	// return &Pokemon{pokemonJSON.Name, simplifiedTypes}, nil
 }
 
 // pokemonJSON is a struct for defining parsing of the JSON response
